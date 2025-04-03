@@ -62,9 +62,8 @@ for entity in msp:
             linepoints = [point for point in points]
             lines.append(linepoints)
         elif entity.dxftype() == 'POLYLINE':
-            print(entity.points())
-            # points_list = [point[:2] for point in entity.points()]
-
+            linepoints = [[point[0], point[1], point[2]] for point in entity.points()]
+            lines.append(linepoints)
     except Exception as e:
         print(f"Error processing entity {entity}: {e}")
 
