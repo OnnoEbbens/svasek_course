@@ -78,18 +78,30 @@ def get_insert(entity):
             linepoints.append(get_polylines(sub_entity))
     return linepoints
 
+lines = {
+    'LINES': [],
+    'LWPOLYLINES': [],
+    'POLYLINES': [],
+    'BLOCKS': []
+}
 for entity in msp:
     try:
         if entity.dxftype() == 'LINE':
-            linepoints = [entity.dxf.start, entity.dxf.end]
-            lines.append(linepoints)
+            linepoints = get_lines(entity)
+            lines['LINES'].append(linepoints)
+
         elif entity.dxftype() == 'LWPOLYLINE':
-            points = entity.get_points('xyz')
-            linepoints = [point for point in points]
-            lines.append(linepoints)
+            linepoints = get_lwpolylines(entity)
+            lines['LWPOLYLINES'].append(linepoints)
+
         elif entity.dxftype() == 'POLYLINE':
-            linepoints = [[point[0], point[1], point[2]] for point in entity.points()]
-            lines.append(linepoints)
+            linepoints = get_polylines(entity)
+            lines['POLYLINES'].append(linepoints)
+
+        elif entity.dxftype() == 'INSERT':
+            linepoints = get_insert(entity)
+            lines['BLOCKS'].append(linepoints)
+
     except Exception as e:
         print(f"Error processing entity {entity}: {e}")
 
