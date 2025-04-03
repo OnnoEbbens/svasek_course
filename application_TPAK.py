@@ -92,8 +92,6 @@ def elem2p(trip,ze):
     zp[aa == 0] = np.nan
     return zp
 
-runid = r'T:\Python\SvasekScripts\TPak\FECSM2021_METEO_20250402_1800'
-
 class Model:
     def __init__(self, runid):
         mesh  = loadmat(os.path.join(runid, 'Mesh01.mat'))
@@ -113,7 +111,7 @@ class Model:
 
         ds = xr.Dataset({
             "tri": tri-1, "xe": xe, "ye": ye, "x": x, "y": y,
-            "U": Ue, "V": Ve, "He": He,
+            "Ue": Ue, "Ve": Ve, "He": He,
             "U": U, "V": V, "H": H
             },
             coords={
@@ -123,10 +121,13 @@ class Model:
             })
         self.ds = ds
 
-    def interpolate(self, var, xg, yg):
+    def interpolate(self, var, x, y):
         # Create triangulation object
         triang = mtri.Triangulation(self.ds['x'], self.ds['y'], self.ds['tri'])
         fU = mtri.LinearTriInterpolator(triang, self.ds['U'])
         fV = mtri.LinearTriInterpolator(triang, self.ds['V'])
         fH = mtri.LinearTriInterpolator(triang, self.ds['H'])
-        U_interp = fU(xg, yg)
+        U_interp = fU(x, y)
+
+runid = r'T:\Python\SvasekScripts\TPak\FECSM2021_METEO_20250402_1800'
+model = Model(runid)
