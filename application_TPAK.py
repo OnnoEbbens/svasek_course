@@ -107,18 +107,30 @@ class Model:
         He = xr.DataArray(flow1['H'], dims=["element"], name="water level at elements")
         U = xr.DataArray(elem2p(mesh['tri'], flow1['U']), dims=["node"], name="horizontal current velocity at nodes")
         V = xr.DataArray(elem2p(mesh['tri'], flow1['V']), dims=["node"], name="vertical current velocity at nodes")
-        H = xr.DataArray(elem2p(mesh['tri'], flow1['H']), dims=["node"], name="water level at nodes")
+        H = xr.DataArray(elem2p(mesh['tri'], flow1['H']), dims=["node"], attrs={'name':"water level at nodes"})
 
+        # ds = xr.Dataset({
+        #     "tri": tri-1, "xe": xe, "ye": ye, "x": x, "y": y,
+        #     "Ue": Ue, "Ve": Ve, "He": He,
+        #     "U": U, "V": V, "H": H
+        #     },
+        #     coords={
+        #         "node": np.arange(len(x)),
+        #         "element": np.arange(len(tri)),
+        #         "vertex": np.arange(3)
+        #     })
+        
         ds = xr.Dataset({
-            "tri": tri-1, "xe": xe, "ye": ye, "x": x, "y": y,
             "Ue": Ue, "Ve": Ve, "He": He,
             "U": U, "V": V, "H": H
             },
             coords={
                 "node": np.arange(len(x)),
                 "element": np.arange(len(tri)),
-                "vertex": np.arange(3)
+                "vertex": np.arange(3),
+                "tri": tri-1, "xe": xe, "ye": ye, "x": x, "y": y,
             })
+        
         self.ds = ds
 
     def interpolate(self, var, x, y):
