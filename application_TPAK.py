@@ -93,34 +93,40 @@ def elem2p(trip,ze):
     return zp
 
 runid = r'T:\Python\SvasekScripts\TPak\FECSM2021_METEO_20250402_1800'
-mesh  = loadmat(os.path.join(runid, 'Mesh01.mat'))
-flow1 = loadmat(os.path.join(runid, 'Flow_20250402_180000.mat'))
 
-tri = xr.DataArray(mesh['tri'], dims=["element", "vertex"], name="triangles")
-xe = xr.DataArray(mesh['xe'], dims=["element"], name="x-coordinate at elements")
-ye = xr.DataArray(mesh['ye'], dims=["element"], name="y-coordinate at elements")
-x = xr.DataArray(mesh['x'], dims=["node"], name="x-coordinate at nodes")
-y = xr.DataArray(mesh['y'], dims=["node"], name="y-coordinate at nodes")
-Ue = xr.DataArray(flow1['U'], dims=["element"], name="horizontal current velocity at elements")
-Ve = xr.DataArray(flow1['V'], dims=["element"], name="vertical current velocity at elements")
-He = xr.DataArray(flow1['H'], dims=["element"], name="water level at elements")
-U = xr.DataArray(elem2p(mesh['tri'], flow1['U']), dims=["node"], name="horizontal current velocity at nodes")
-V = xr.DataArray(elem2p(mesh['tri'], flow1['V']), dims=["node"], name="vertical current velocity at nodes")
-H = xr.DataArray(elem2p(mesh['tri'], flow1['H']), dims=["node"], name="water level at nodes")
+class Model:
+    def __init__(self, runid):
+        mesh  = loadmat(os.path.join(runid, 'Mesh01.mat'))
+        flow1 = loadmat(os.path.join(runid, 'Flow_20250402_180000.mat'))
 
-ds = xr.Dataset({
-    "tri": tri-1, "xe": xe, "ye": ye, "x": x, "y": y,
-    "U": Ue, "V": Ve, "He": He,
-    "U": U, "V": V, "H": H
-    },
-    coords={
-        "node": np.arange(len(x)),
-        "element": np.arange(len(tri)),
-        "vertex": np.arange(3)
-    })
+        tri = xr.DataArray(mesh['tri'], dims=["element", "vertex"], name="triangles")
+        xe = xr.DataArray(mesh['xe'], dims=["element"], name="x-coordinate at elements")
+        ye = xr.DataArray(mesh['ye'], dims=["element"], name="y-coordinate at elements")
+        x = xr.DataArray(mesh['x'], dims=["node"], name="x-coordinate at nodes")
+        y = xr.DataArray(mesh['y'], dims=["node"], name="y-coordinate at nodes")
+        Ue = xr.DataArray(flow1['U'], dims=["element"], name="horizontal current velocity at elements")
+        Ve = xr.DataArray(flow1['V'], dims=["element"], name="vertical current velocity at elements")
+        He = xr.DataArray(flow1['H'], dims=["element"], name="water level at elements")
+        U = xr.DataArray(elem2p(mesh['tri'], flow1['U']), dims=["node"], name="horizontal current velocity at nodes")
+        V = xr.DataArray(elem2p(mesh['tri'], flow1['V']), dims=["node"], name="vertical current velocity at nodes")
+        H = xr.DataArray(elem2p(mesh['tri'], flow1['H']), dims=["node"], name="water level at nodes")
 
-# Create triangulation object
-triang = mtri.Triangulation(ds['x'], ds['y'], ds['tri'])
-fU = mtri.LinearTriInterpolator(triang, ds['U'])
-fV = mtri.LinearTriInterpolator(triang, ds['V'])
-fH = mtri.LinearTriInterpolator(triang, ds['H'])
+        ds = xr.Dataset({
+            "tri": tri-1, "xe": xe, "ye": ye, "x": x, "y": y,
+            "U": Ue, "V": Ve, "He": He,
+            "U": U, "V": V, "H": H
+            },
+            coords={
+                "node": np.arange(len(x)),
+                "element": np.arange(len(tri)),
+                "vertex": np.arange(3)
+            })
+        self.ds = ds
+
+    def interpolate(self, var, xg, yg):
+        # Create triangulation object
+        triang = mtri.Triangulation(self.ds['x'], self.ds['y'], self.ds['tri'])
+        fU = mtri.LinearTriInterpolator(triang, self.ds['U'])
+        fV = mtri.LinearTriInterpolator(triang, self.ds['V'])
+        fH = mtri.LinearTriInterpolator(triang, self.ds['H'])
+        U_interp = fU(xg, yg)
