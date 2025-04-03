@@ -66,7 +66,7 @@ for polyline in msp.query('POLYLINE'):
 
 lw_polylines = []
 for lwpolyline in msp.query('LWPOLYLINE'):
-    i_lwpolyline = []
+    i_lwpolyline = [i+345]
     # Get the vertices of the polyline
     for vertex in lwpolyline.vertices_in_wcs():
         i_lwpolyline.append(vertex.format())
