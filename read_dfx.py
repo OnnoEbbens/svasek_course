@@ -105,5 +105,58 @@ for entity in msp:
     except Exception as e:
         print(f"Error processing entity {entity}: {e}")
 
+# %% Plot the lines in 2D
+
+def plot_lines(lines, color, x_index=0, y_index=1, **kwargs):
+    for line in lines:
+        if len(line) == 2:
+            x = [line[0][x_index], line[1][x_index]]
+            y = [line[0][y_index], line[1][y_index]]
+            plt.plot(x, y, color=color, **kwargs)
+        elif len(line) > 2:
+            x = [point[x_index] for point in line]
+            y = [point[y_index] for point in line]
+            plt.plot(x, y, color=color, **kwargs)
+
+
+plt.figure()
+plt.subplot(2,1,1, aspect='equal')
+for i, shape in enumerate(lines.keys()):
+    print(f"Plotting {shape}: {len(lines[shape])}")
+    if shape == 'BLOCKS':
+        for block in lines[shape]:
+            plot_lines(block, 'r', alpha=0.5)
+    elif shape == 'LINES':
+        plot_lines(lines[shape], 'b', alpha=0.5)
+    elif shape == 'LWPOLYLINES':
+        plot_lines(lines[shape], 'g', alpha=0.5)
+    elif shape == 'POLYLINES':
+        plot_lines(lines[shape], 'c', alpha=0.5)
+
+plt.title("DXF Lines")
+plt.xlabel("X-axis")
+plt.ylabel("Y-axis")
+plt.axis('equal')
+plt.grid()
+
+plt.subplot(2,1,2, aspect='equal')
+for i, shape in enumerate(lines.keys()):
+    print(f"Plotting {shape}: {len(lines[shape])}")
+    if shape == 'BLOCKS':
+        for block in lines[shape]:
+            plot_lines(block, 'r', 1, 2)
+    elif shape == 'LINES':
+        plot_lines(lines[shape], 'b', 1, 2)
+    elif shape == 'LWPOLYLINES':
+        plot_lines(lines[shape], 'g', 1, 2)
+    elif shape == 'POLYLINES':
+        plot_lines(lines[shape], 'c', 1, 2)
+
+plt.title("DXF Lines")
+plt.xlabel("X-axis")
+plt.ylabel("Y-axis")
+plt.axis('equal')
+plt.grid()
+plt.show()
 
 # %%
