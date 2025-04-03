@@ -11,9 +11,11 @@
 import numpy as np
 import ezdxf
 from collections import Counter
+import matplotlib.pyplot as plt
 
 # %% Input
-filename = '../oostende_2d.dxf'
+filename = '../oostende.dxf'
+# filename = '../bridge.dxf'
 
 # %% Functions
 # Read DXF file and get info
@@ -24,7 +26,6 @@ msp = doc.modelspace()
 entities = Counter()
 for entity in msp:
     entities[entity.dxftype()] += 1
-    print(type(entity))
 
 print(f"Entities in {filename}:")
 for entity_type, count in entities.items():
@@ -51,7 +52,32 @@ else:
 
 # %% Split the entities
 
-lines = []
+def get_lines(entity):
+    linepoints = [entity.dxf.start, entity.dxf.end]
+    return linepoints
+
+def get_lwpolylines(entity):
+    points = entity.get_points('xy')
+    elevation = entity.dxf.elevation
+    linepoints = [list(point) + [elevation] for point in points]
+    return linepoints
+
+def get_polylines(entity):
+    linepoints = [[point[0], point[1], point[2]] for point in entity.points()]
+    return linepoints
+
+def get_insert(entity):
+    linepoints = []
+    sub_entities = entity.virtual_entities()
+    for sub_entity in sub_entities:
+        if sub_entity.dxftype() == 'LINE':
+            linepoints.append(get_lines(sub_entity))
+        elif sub_entity.dxftype() == 'LWPOLYLINE':
+            linepoints.append(get_lwpolylines(sub_entity))
+        elif sub_entity.dxftype() == 'POLYLINE':
+            linepoints.append(get_polylines(sub_entity))
+    return linepoints
+
 for entity in msp:
     try:
         if entity.dxftype() == 'LINE':
