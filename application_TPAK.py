@@ -1,9 +1,17 @@
 import xarray as xr
+# import uxarray as ux 
+import xugrid as xu #deltares
 import numpy as np
 import scipy.io as sio
+import scipy.interpolate as sci
 from scipy import sparse
 import os
+import matplotlib.pyplot as plt
 import matplotlib.tri as mtri
+import glob
+import datetime
+#TODO: package maken van deze module
+# from .plots import _plot_windrose
 
 # loadmat() laadt een .mat bestand in en zet alle data in dictionaries
 def loadmat(filename):
@@ -92,46 +100,132 @@ def elem2p(trip,ze):
     zp[aa == 0] = np.nan
     return zp
 
+def datenum2datetime(datenum):
+    return datetime.datetime.fromordinal(int(datenum)) + datetime.timedelta(days=datenum%1) - datetime.timedelta(days = 366)
+
 class Model:
     def __init__(self, runid):
-        mesh  = loadmat(os.path.join(runid, 'Mesh01.mat'))
-        flow1 = loadmat(os.path.join(runid, 'Flow_20250402_180000.mat'))
-
-        tri = xr.DataArray(mesh['tri'], dims=["element", "vertex"], attrs={'name': "triangles"})
-        xe = xr.DataArray(mesh['xe'], dims=["element"], attrs={'name': "x-coordinate at elements"})
-        ye = xr.DataArray(mesh['ye'], dims=["element"], attrs={'name': "y-coordinate at elements"})
-        x = xr.DataArray(mesh['x'], dims=["node"], attrs={'name': "x-coordinate at nodes"})
-        y = xr.DataArray(mesh['y'], dims=["node"], attrs={'name': "y-coordinate at nodes"})
-        Ue = xr.DataArray(flow1['U'], dims=["element"], attrs={'name': "horizontal current velocity at elements"})
-        Ve = xr.DataArray(flow1['V'], dims=["element"], attrs={'name': "vertical current velocity at elements"})
-        He = xr.DataArray(flow1['H'], dims=["element"], attrs={'name': "water level at elements"})
-        U = xr.DataArray(elem2p(mesh['tri'], flow1['U']), dims=["node"], attrs={'name': "horizontal current velocity at nodes"})
-        V = xr.DataArray(elem2p(mesh['tri'], flow1['V']), dims=["node"], attrs={'name': "vertical current velocity at nodes"})
-        H = xr.DataArray(elem2p(mesh['tri'], flow1['H']), dims=["node"], attrs={'name': "water level at nodes"})
         
-        ds = xr.Dataset({
-            "Ue": Ue, "Ve": Ve, "He": He,
-            "U": U, "V": V, "H": H
-            },
-            coords={
-                "node": np.arange(len(x)),
-                "element": np.arange(len(tri)),
-                "vertex": np.arange(3),
-                "tri": tri-1, "xe": xe, "ye": ye, "x": x, "y": y,
+        if os.path.isfile(os.path.join(runid, 'results_merged.nc')):
+            self.ds_map = xr.open_dataset(os.path.join(runid, 'results_merged.nc'))
+
+        else:
+            mesh  = loadmat(os.path.join(runid, 'Mesh01.mat'))
+            flowfiles = sorted(glob.glob(os.path.join(runid, 'Flow*.mat')))
+            time = []; U = []; V = []; H = []; Ue = []; Ve = []; He = [];
+            for flowfile in flowfiles:
+                flow = loadmat(flowfile)
+                time.append(datenum2datetime(flow['mattime']))
+                Ue.append(xr.DataArray(flow['U'], dims=["element"], attrs={'name': "horizontal current velocity at elements"}))
+                Ve.append(xr.DataArray(flow['V'], dims=["element"], attrs={'name': "vertical current velocity at elements"}))
+                He.append(xr.DataArray(flow['H'], dims=["element"], attrs={'name': "water level at elements"}))
+                U.append(xr.DataArray(elem2p(mesh['tri'], flow['U']), dims=["node"], attrs={'name': "horizontal current velocity at nodes"}))
+                V.append(xr.DataArray(elem2p(mesh['tri'], flow['V']), dims=["node"], attrs={'name': "vertical current velocity at nodes"}))
+                H.append(xr.DataArray(elem2p(mesh['tri'], flow['H']), dims=["node"], attrs={'name': "water level at nodes"}))
+            
+            tri = xr.DataArray(mesh['tri'], dims=["element", "vertex"], attrs={'name': "triangles"})
+            xe = xr.DataArray(mesh['xe'], dims=["element"], attrs={'name': "x-coordinate at elements"})
+            ye = xr.DataArray(mesh['ye'], dims=["element"], attrs={'name': "y-coordinate at elements"})
+            x = xr.DataArray(mesh['x'], dims=["node"], attrs={'name': "x-coordinate at nodes"})
+            y = xr.DataArray(mesh['y'], dims=["node"], attrs={'name': "y-coordinate at nodes"})
+            Ue = xr.concat(Ue, dim='time')
+            Ve = xr.concat(Ve, dim='time')
+            He = xr.concat(He, dim='time')
+            U = xr.concat(U, dim='time')
+            V = xr.concat(V, dim='time')
+            H = xr.concat(H, dim='time')
+
+            # ds_map = xr.Dataset({
+            #     "Ue": Ue, "Ve": Ve, "He": He,
+            #     "U": U, "V": V, "H": H
+            #     },
+            #     coords={
+            #         "time": time,
+            #         "node": np.arange(len(x)),
+            #         "element": np.arange(len(tri)),
+            #         "vertex": np.arange(3),
+            #         "tri": tri-1, "xe": xe, "ye": ye, "x": x, "y": y,
+            #     })
+            # ds_map.to_netcdf(os.path.join(runid, 'results_merged.nc'), 'w')
+            # self.ds_map = ds_map
+            
+            ds = xr.Dataset({
+                "Mesh2_face_nodes": (["nMesh2_face", "nMaxNodesPerFace"], mesh["tri"]),
+                "Mesh2_node_x": (["nMesh2_node"], mesh["x"]),
+                "Mesh2_node_y": (["nMesh2_node"], mesh["y"]),
+                "U": (["nMesh2_face"], Ue.values[0]),
+                "V": (["nMesh2_face"], Ve.values[0]),
+                "H": (["nMesh2_face"], He.values[0]),
             })
-        
-        self.ds = ds
+            # Add required UGRID attributes
+            ds["Mesh2_face_nodes"].attrs.update({
+                "cf_role": "face_node_connectivity",
+                "long_name": "Face to node connectivity",
+                "start_index": 1,
+                "mesh": "Mesh2"
+            })
+            ds["Mesh2_node_x"].attrs.update({
+                "standard_name": "projection_x_coordinate",   # or "projection_y_coordinate"
+                "units": "meters"
+            })
+            ds["Mesh2_node_y"].attrs.update({
+                "standard_name": "projection_y_coordinate",   # or "projection_y_coordinate"
+                "units": "meters"
+            })
+            # Add global mesh_topology variable
+            ds["Mesh2"] = xr.DataArray(0)
+            ds["Mesh2"].attrs.update({
+                "cf_role": "mesh_topology",
+                "topology_dimension": 2,
+                "node_coordinates": "Mesh2_node_x Mesh2_node_y",
+                "face_node_connectivity": "Mesh2_face_nodes"
+            })
+            ds.attrs["Conventions"] = "UGRID-1.0"
 
-    def interpolate(self, var, x, y):
+            # Create the dataset
+            #optie 1
+            # ugrid = ux.open_grid(ds)
+            # uds = ux.UxDataset.from_xarray(ds)
+
+            #optie 2
+            uds = xu.UgridDataset(ds)
+
+            # Get a cross-section
+            
+
+
+    def interpolate(self, time, x, y, elem2p=True):
+        #TODO: interpoleren over de tijd
+        #TODO: nearest-optie?
         #TODO: loop over alle variabelen met coordinates "nodes"
         # maak een nieuwe xarray.Dataset met coordinaten x,y
         
         # Create triangulation object
-        triang = mtri.Triangulation(self.ds['x'], self.ds['y'], self.ds['tri'])
-        fU = mtri.LinearTriInterpolator(triang, self.ds['U'])
-        fV = mtri.LinearTriInterpolator(triang, self.ds['V'])
-        fH = mtri.LinearTriInterpolator(triang, self.ds['H'])
+        trimesh = mtri.Triangulation(self.ds['x'], self.ds['y'], self.ds['tri'])
+        fU = mtri.LinearTriInterpolator(trimesh, self.ds['U'].isel(time=0))
+        fV = mtri.LinearTriInterpolator(trimesh, self.ds['V'].isel(time=0))
+        fH = mtri.LinearTriInterpolator(trimesh, self.ds['H'].isel(time=0))
         U_interp = fU(x, y)
 
-runid = r'T:\Python\SvasekScripts\TPak\FECSM2021_METEO_20250402_1800'
-model = Model(runid)
+        #interpolate with griddata
+        U_interp = sci.griddata((self.ds['xe'], self.ds['ye']))
+
+        return U_interp
+
+    def plot(self, time=0):
+        self.fig = plt.figure(figsize=(5, 4), dpi=100)
+        self.axes = self.fig.add_axes([0.05,0.1,0.77,0.8])
+        trimesh = mtri.Triangulation(self.ds_map['x'], self.ds_map['y'], self.ds_map['tri'])
+        self.axes.tripcolor(trimesh, self.ds_map['H'].values)
+    # def plot_windrose(self):
+    #     """test"""
+    #     _plot_windrose(self.ds)
+
+if __name__ == '__main__':
+    runid = r'T:\Python\SvasekScripts\TPak\FECSM2021_METEO_20250402_1800'
+    model = Model(runid)
+    xg = np.linspace(model.ds_map.xe.min().values, model.ds_map.xe.max().values, 100)
+    yg = np.linspace(model.ds_map.ye.min().values, model.ds_map.ye.max().values, 100)
+    # model_klein = model.interpolate(0, xg, yg)
+    model.plot()
+    # model_klein.plot_windrose()
