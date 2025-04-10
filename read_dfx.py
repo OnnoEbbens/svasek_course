@@ -37,10 +37,10 @@ for entity in entities:
     for geometry in msp.query(entity):
         try:
             start = geometry.dxf.start
-            if start[2] >= 1E-6:
+            if start[2] >= 1e-6:
                 is_3d = True
                 print(start)
-                break  
+                break
         except ezdxf.DXFAttributeError:
             continue
 
@@ -54,56 +54,63 @@ else:
 
 def get_lines(entity):
     linepoints = [entity.dxf.start, entity.dxf.end]
-    return linepoints
+    line = LineString(linepoints)
+    return line
+
 
 def get_lwpolylines(entity):
-    points = entity.get_points('xy')
+    points = entity.get_points("xy")
     elevation = entity.dxf.elevation
     linepoints = [list(point) + [elevation] for point in points]
-    return linepoints
+    if linepoints[-1] == linepoints[0]:
+        line = Polygon(linepoints)
+    else:
+        line = LineString(linepoints)
+    return line
+
 
 def get_polylines(entity):
     linepoints = [[point[0], point[1], point[2]] for point in entity.points()]
-    return linepoints
+    if linepoints[-1] == linepoints[0]:
+        line = Polygon(linepoints)
+    else:
+        line = LineString(linepoints)
+    return line
+
 
 def get_insert(entity):
     linepoints = []
     sub_entities = entity.virtual_entities()
     for sub_entity in sub_entities:
-        if sub_entity.dxftype() == 'LINE':
+        if sub_entity.dxftype() == "LINE":
             linepoints.append(get_lines(sub_entity))
-        elif sub_entity.dxftype() == 'LWPOLYLINE':
+        elif sub_entity.dxftype() == "LWPOLYLINE":
             linepoints.append(get_lwpolylines(sub_entity))
-        elif sub_entity.dxftype() == 'POLYLINE':
+        elif sub_entity.dxftype() == "POLYLINE":
             linepoints.append(get_polylines(sub_entity))
     return linepoints
 
-lines = {
-    'LINES': [],
-    'LWPOLYLINES': [],
-    'POLYLINES': [],
-    'BLOCKS': []
-}
+lines = {"LINES": [], "LWPOLYLINES": [], "POLYLINES": [], "BLOCKS": []}
 for entity in msp:
-    try:
-        if entity.dxftype() == 'LINE':
-            linepoints = get_lines(entity)
-            lines['LINES'].append(linepoints)
+    # try:
+    if entity.dxftype() == "LINE":
+        line = get_lines(entity)
+        lines["LINES"].append(line)
 
-        elif entity.dxftype() == 'LWPOLYLINE':
-            linepoints = get_lwpolylines(entity)
-            lines['LWPOLYLINES'].append(linepoints)
+    elif entity.dxftype() == "LWPOLYLINE":
+        line = get_lwpolylines(entity)
+        lines["LWPOLYLINES"].append(line)
 
-        elif entity.dxftype() == 'POLYLINE':
-            linepoints = get_polylines(entity)
-            lines['POLYLINES'].append(linepoints)
+    elif entity.dxftype() == "POLYLINE":
+        line = get_polylines(entity)
+        lines["POLYLINES"].append(line)
 
-        elif entity.dxftype() == 'INSERT':
-            linepoints = get_insert(entity)
-            lines['BLOCKS'].append(linepoints)
+    elif entity.dxftype() == "INSERT":
+        line = get_insert(entity)
+        [lines["BLOCKS"].append(iline) for iline in line]
 
-    except Exception as e:
-        print(f"Error processing entity {entity}: {e}")
+    # except Exception as e:
+        # print(f"Error processing entity {entity}: {e}")
 
 # %% Plot the lines in 2D
 
