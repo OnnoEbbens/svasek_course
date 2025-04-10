@@ -160,6 +160,26 @@ for i, shape in enumerate(lines.keys()):
         plot_lines(lines[shape], 'c', 1, 2)
 
 plt.title("DXF Lines")
+def change_xy_to_yz(geom):
+    if type(geom) == shapely.geometry.linestring.LineString:
+        points = [arr for arr in geom.coords]
+        coords = [(y, z) for x, y, z in points]
+        return LineString(coords)
+    elif type(geom) == shapely.geometry.polygon.Polygon:
+        pass
+
+
+gpd_lines = gpd.GeoDataFrame({"geometry": lines["LINES"]})
+gpd_lwpolylines = gpd.GeoDataFrame({"geometry": lines["LWPOLYLINES"]})
+gpd_polylines = gpd.GeoDataFrame({"geometry": lines["POLYLINES"]})
+gpd_blocks = gpd.GeoDataFrame({"geometry": lines["BLOCKS"]})
+
+gpd_data = pd.concat([gpd_lines, gpd_lwpolylines, gpd_polylines, gpd_blocks], ignore_index=True)
+gpd_data["geometry"].force_3d()
+gpd_data["geometry_yz"] = gpd_data["geometry"].apply(change_xy_to_yz)
+
+# gpd_blocks = gpd.GeoDataFrame({'geometry': lines['BLOCKS']})
+
 plt.xlabel("X-axis")
 plt.ylabel("Y-axis")
 plt.axis('equal')
