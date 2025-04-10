@@ -28,6 +28,11 @@ from shapely.geometry import Polygon, LineString
 # %% Class definitions
 class DXFReader:
     def __init__(self, filename):
+        """Object to read and extract information from DXF files.
+
+        Args:
+            filename (str): path to DXF file.
+        """
         print(f"Reading DXF file: {filename}")
         self.filename = filename
         self.doc = ezdxf.readfile(filename)
@@ -40,8 +45,7 @@ class DXFReader:
         self.detect_3d()
 
     def get_entities(self):
-        """Get a summary of the entities in the DXF file.
-        """
+        """Get a summary of the entities in the DXF file."""
         for entity in self.msp:
             self.entities[entity.dxftype()] += 1
 
@@ -52,8 +56,7 @@ class DXFReader:
         print("")
 
     def detect_3d(self):
-        """Detect if the DXF file is 3D or 2D.
-        """
+        """Detect if the DXF file is 3D or 2D."""
         for entity in self.entities:
             for geometry in self.msp.query(entity):
                 try:
@@ -88,8 +91,7 @@ class DXFReader:
             self.get_yz()
 
     def plot_dxf(self):
-        """Plot the DXF file
-        """
+        """Plot the DXF file"""
         fig1, ax1 = self._set_fig()
         plt.title("Top down view")
         plt.xlabel("X-axis")
@@ -110,8 +112,7 @@ class DXFReader:
         plt.show()
 
     def get_yz(self):
-        """Ge the yz coordinates of the geometry
-        """
+        """Ge the yz coordinates of the geometry"""
         self.gpd_data["geometry_yz"] = self.gpd_data["geometry"].apply(
             self._change_xy_to_yz
         )
@@ -219,8 +220,7 @@ class DXFReader:
         return ser
 
     def get_lines_from_rectangle(self):
-        """Select lines from a rectangle in the figure and save to csv/geojson files.
-        """
+        """Select lines from a rectangle in the figure and save to csv/geojson files."""
         fig, ax = self._set_fig()
         plt.xlabel("X-axis")
         plt.ylabel("Y-axis")
@@ -304,8 +304,7 @@ class DXFReader:
         plt.show()
 
     def _entities_to_shapely(self):
-        """Transform the DXF entities to shapely geometries.
-        """
+        """Transform the DXF entities to shapely geometries."""
         for entity in self.msp:
             try:
                 if entity.dxftype() == "LINE":
@@ -449,7 +448,8 @@ def georeference_from_points(src1, src2, dst1, dst2):
 
 # %% Input
 if __name__ == "__main__":
-    filename = "../oostende.dxf"
+    filename2d = "../oostende_2d.dxf"
+    filename3d = "../oostende.dxf"
 
     # Read in the DXF file
     dxf = DXFReader(filename)
