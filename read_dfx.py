@@ -13,12 +13,15 @@
 # %% Imports
 import ezdxf
 import simplekml
+import numpy as np
+import contextily as ctx
 import pandas as pd
 import geopandas as gpd
 from collections import Counter
 import matplotlib.pyplot as plt
 from matplotlib.widgets import RectangleSelector
 import shapely
+from shapely.affinity import affine_transform
 from shapely.geometry import Polygon, LineString
 
 
@@ -92,6 +95,8 @@ class DXFReader:
         plt.xlabel("X-axis")
         plt.ylabel("Y-axis")
         self.gpd_data["geometry"].plot(ax=ax1, color="k", alpha=0.5, edgecolor="black")
+        if self.gpd_data.crs is not None:
+            ctx.add_basemap(ax1, crs=self.gpd_data.crs.to_proj4())
 
         if self.is_3d:
             fig2, ax2 = self._set_fig()
