@@ -14,6 +14,7 @@
 
 # %% Imports
 import ezdxf
+import simplekml
 import pandas as pd
 import geopandas as gpd
 from collections import Counter
@@ -22,10 +23,11 @@ from matplotlib.widgets import RectangleSelector
 import shapely
 from shapely.geometry import Polygon, LineString
 
+
 # %% Class definitions
 class DXFReader:
     def __init__(self, filename):
-        print(f'Reading DXF file: {filename}')
+        print(f"Reading DXF file: {filename}")
         self.filename = filename
         self.doc = ezdxf.readfile(filename)
         self.msp = self.doc.modelspace()
@@ -36,17 +38,15 @@ class DXFReader:
         self.get_entities()
         self.detect_3d()
 
-
     def get_entities(self):
         for entity in self.msp:
             self.entities[entity.dxftype()] += 1
-        
-        print('')
+
+        print("")
         print(f"Entities in {self.filename}:")
         for entity_type, count in self.entities.items():
             print(f"{entity_type}: {count}")
-        print('')
-
+        print("")
 
     def detect_3d(self):
         for entity in self.entities:
@@ -63,8 +63,7 @@ class DXFReader:
             print("3D DXF file detected.")
         else:
             print("2D DXF file detected.")
-        print('')
-
+        print("")
 
     def entities_to_gpd(self):
         self._entities_to_shapely()
@@ -73,14 +72,14 @@ class DXFReader:
         gpd_polylines = gpd.GeoDataFrame({"geometry": self.lines["POLYLINES"]})
         gpd_blocks = gpd.GeoDataFrame({"geometry": self.lines["BLOCKS"]})
 
-        self.gpd_data = pd.concat([gpd_lines, gpd_lwpolylines, gpd_polylines, gpd_blocks], ignore_index=True)
+        self.gpd_data = pd.concat(
+            [gpd_lines, gpd_lwpolylines, gpd_polylines, gpd_blocks], ignore_index=True
+        )
         if self.is_3d:
             self.gpd_data["geometry"].force_3d()
             self.get_yz()
 
-
     def plot_dxf(self):
-
         fig1, ax1 = self._set_fig()
         plt.title("Top down view")
         plt.xlabel("X-axis")
@@ -92,36 +91,48 @@ class DXFReader:
             plt.title("Side view")
             plt.xlabel("Y-axis")
             plt.ylabel("Z-axis")
-            self.gpd_data["geometry_yz"].plot(ax=ax2, color="k", alpha=0.5, edgecolor="black")
+            self.gpd_data["geometry_yz"].plot(
+                ax=ax2, color="k", alpha=0.5, edgecolor="black"
+            )
 
         plt.show()
 
-
     def get_yz(self):
-        self.gpd_data["geometry_yz"] = self.gpd_data["geometry"].apply(self._change_xy_to_yz)
+        self.gpd_data["geometry_yz"] = self.gpd_data["geometry"].apply(
+            self._change_xy_to_yz
+        )
 
+    def set_crs(self, crs):
+        self.gpd_data.set_crs(crs, inplace=True)
 
+    def transform_crs(self, crs):
+        if self.gpd_data.crs is None:
+            raise ValueError("CRS not set. Please set the CRS before transforming.")
+        self.gpd_data.to_crs(crs, inplace=True)
+        
     def get_lines_from_fig(self):
         fig, ax = self._set_fig()
         plt.xlabel("X-axis")
         plt.ylabel("Y-axis")
+        plt.title("Select one or multiple lines from the figure")
 
         # Plot each geometry separately so we can attack a picker
         lines = []
         for geom in self.gpd_data.geometry:
-            if geom.geom_type == 'LineString':
+            if geom.geom_type == "LineString":
                 x, y = geom.xy
-                line, = ax.plot(x, y, color='k', alpha=0.5, picker=2)
+                (line,) = ax.plot(x, y, color="k", alpha=0.5, picker=2)
                 lines.append(line)
 
         # Pick event callback
         x_data = []
         y_data = []
+
         def on_pick(event):
             line = event.artist
             xdata = line.get_xdata()
             ydata = line.get_ydata()
-            
+
             print("Selected line coordinates:")
             print(list(zip(xdata, ydata)))
 
@@ -133,11 +144,14 @@ class DXFReader:
 
         fig.canvas.mpl_connect("pick_event", on_pick)
         plt.show()
-        
+
+        if not x_data:
+            print("No valid lines selected.")
+            return
+
         self.lines_to_csv(x_data, y_data)
         return x_data, y_data
-    
-    
+
     def lines_to_csv(self, x_lines, y_lines):
         # Save x and y to csv file
         for i in range(len(x_lines)):
@@ -146,13 +160,15 @@ class DXFReader:
             df = pd.DataFrame({"x": ix, "y": iy})
             df.to_csv(f"line_{i}.csv", index=False)
 
-
     def extract_from_polygon(self, x_p, y_p, z=None):
         poly = Polygon([(x_p, y_p) for x_p, y_p in zip(x_p, y_p)])
         mask = self.gpd_data.geometry.within(poly)
         ser = self.gpd_data[mask]
+
+        # Check for crs in ser
+        if self.gpd_data.crs is not None:
+            ser.set_crs(self.gpd_data.crs, inplace=True)
         return ser
-    
 
     def get_lines_from_rectangle(self):
         fig, ax = self._set_fig()
@@ -175,9 +191,8 @@ class DXFReader:
             x_min, x_max = sorted([x1, x2])
             y_min, y_max = sorted([y1, y2])
 
-            corners = [(x_min, y_min), (x_min, y_max),
-                    (x_max, y_max), (x_max, y_min)]
-            
+            corners = [(x_min, y_min), (x_min, y_max), (x_max, y_max), (x_max, y_min)]
+
             selected_rectangles.append(corners)
 
             print("Rectangle drawn with corners:")
@@ -185,40 +200,58 @@ class DXFReader:
                 print(f"  Corner {i}: ({x:.2f}, {y:.2f})")
 
             # Optional: draw rectangle for visual feedback
-            rect = plt.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min,
-                                linewidth=2, edgecolor='red', facecolor='none')
+            rect = plt.Rectangle(
+                (x_min, y_min),
+                x_max - x_min,
+                y_max - y_min,
+                linewidth=2,
+                edgecolor="red",
+                facecolor="none",
+            )
             ax.add_patch(rect)
             fig.canvas.draw()
 
         # Create RectangleSelector
         toggle_selector = RectangleSelector(
-            ax, on_select,
+            ax,
+            on_select,
             useblit=True,
             button=[1],  # Left mouse button
-            minspanx=1, minspany=1,
-            spancoords='data',
-            interactive=True
+            minspanx=0,
+            minspany=0,
+            spancoords="data",
+            interactive=True,
         )
 
         plt.show()
 
+        # Return if we have no lines
+        if not selected_rectangles:
+            print("No rectangles selected or no lines in rectangle.")
+            return
+
         # After window closes, print all stored rectangles
         print("\nAll saved rectangles:")
         for i, rect in enumerate(selected_rectangles):
-            print(f"Rectangle {i+1} corners: {rect}")
+            print(f"Rectangle {i + 1} corners: {rect}")
+
         x_rect = [rect[0] for rect in selected_rectangles[0]]
         y_rect = [rect[1] for rect in selected_rectangles[0]]
 
         selected_lines = self.extract_from_polygon(x_rect, y_rect)
-        selected_lines.to_csv("lines_snippet_from_rectangle.csv", index=False)
+        selected_lines["geometry"].to_csv(
+            "lines_snippet_from_rectangle.csv", index=False
+        )
+        selected_lines["geometry"].to_file(
+            "lines_snippet_from_rectangle.geojson", driver="GeoJSON"
+        )
 
         fig2, ax2 = self._set_fig()
         plt.xlabel("X-axis")
         plt.ylabel("Y-axis")
-        selected_lines["geometry"].plot(ax=ax2,color="k", alpha=0.5, edgecolor="black")
+        selected_lines["geometry"].plot(ax=ax2, color="k", alpha=0.5, edgecolor="black")
         plt.title("Selected lines")
         plt.show()
-
 
     def _entities_to_shapely(self):
         for entity in self.msp:
@@ -241,12 +274,10 @@ class DXFReader:
             except Exception as e:
                 print(f"Error processing entity {entity}: {e}")
 
-
     def _get_lines(self, entity):
         linepoints = [entity.dxf.start, entity.dxf.end]
         line = LineString(linepoints)
         return line
-
 
     def _get_lwpolylines(self, entity):
         points = entity.get_points("xy")
@@ -258,7 +289,6 @@ class DXFReader:
             line = LineString(linepoints)
         return line
 
-
     def _get_polylines(self, entity):
         linepoints = [[point[0], point[1], point[2]] for point in entity.points()]
         if linepoints[-1] == linepoints[0]:
@@ -266,7 +296,6 @@ class DXFReader:
         else:
             line = LineString(linepoints)
         return line
-
 
     def _get_insert(self, entity):
         linepoints = []
@@ -280,25 +309,42 @@ class DXFReader:
                 linepoints.append(self._get_polylines(sub_entity))
         return linepoints
 
-
     def _change_xy_to_yz(self, geom):
         if isinstance(geom, shapely.geometry.linestring.LineString):
             points = [arr for arr in geom.coords]
             coords = [(y, z) for x, y, z in points]
             return LineString(coords)
         else:
-            print(f'Geometry type {type(geom)} not supported for change_xy_to_yz.')
-
+            print(f"Geometry type {type(geom)} not supported for change_xy_to_yz.")
 
     def _set_fig(self):
         fig, ax = plt.subplots()
         plt.grid(True)
-        ax.set_aspect('equal')
+        ax.set_aspect("equal")
         return fig, ax
 
 
+def geojson_to_kml(file):
+    kml = simplekml.Kml()
+    gdf = gpd.read_file(file)
+    for i, row in gdf.iterrows():
+        geom = row.geometry
+        if geom.geom_type == "Polygon":
+            kml.newpolygon(name=str(i), outerboundaryis=geom.exterior.coords[:])
+        elif geom.geom_type == "LineString":
+            kml.newlinestring(name=str(i), coords=geom.coords[:])
+    kml.save(file.replace(".geojson", ".kml"))
+
+
+def lines_to_kml(x, y):
+    kml = simplekml.Kml()
+    for i in range(len(x)):
+        line = kml.newlinestring(name=f"Line {i}", coords=list(zip(x[i], y[i])))
+    kml.save("lines.kml")
+
+
 # %% Input
-if __name__ == '__main__':
+if __name__ == "__main__":
     filename = "../oostende.dxf"
 
     # Read in the DXF file
@@ -307,14 +353,25 @@ if __name__ == '__main__':
     # Create GeoDataFrame from the lines
     dxf.entities_to_gpd()
 
+    # Set CRS
+    dxf.set_crs("EPSG:31370")
+
+    # Transform CRS
+    dxf.transform_crs("EPSG:4326")
+
     # Plot the figures
-    dxf.plot_dxf()
+    # dxf.plot_dxf()
 
     # Extract lines from rectangle in figure
-    dxf.get_lines_from_rectangle()
+    # dxf.get_lines_from_rectangle()
+
+    # Convert GeoJSON to KML
+    # geojson_to_kml("lines_snippet_from_rectangle.geojson")
 
     # Extract lines by clicking in figure
-    dxf.get_lines_from_fig()
+    x_lines, y_lines = dxf.get_lines_from_fig()
 
+    # Lines to kml
+    lines_to_kml(x_lines, y_lines)
 
     exit()
