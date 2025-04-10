@@ -308,4 +308,18 @@ plt.ylabel("Z-axis")
 plt.grid("on")
 plt.show()
 
-# %%
+# %% To CSV
+gpd_data["geometry"].to_csv("lines.csv", index=False)
+
+
+# %% Extract lines from polygon
+
+def make_polygon(x, y):
+    poly_x = [x[0], x[0], x[1], x[1], x[0]]
+    poly_y = [y[0], y[1], y[1], y[0], y[0]]
+    return poly_x, poly_y
+
+x = [-0.06, -0.06, -0.02, -0.02, -0.06]
+y = [-0.16, -0.12, -0.12, -0.16, -0.16]
+ser = extract_from_polygon(gpd_data["geometry"], x, y)
+ser.to_csv("lines_snippet.csv", index=False)
