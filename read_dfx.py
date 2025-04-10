@@ -227,10 +227,78 @@ for i in range(len(x_lines)):
     df = pd.DataFrame({"x": ix, "y": iy})
     df.to_csv(f"line_{i}.csv", index=False)
     
+# %% Draw rectangle to extract lines
+
+def extract_from_polygon(gpd_data, x, y, z=None):
+    poly = Polygon([(x, y) for x, y in zip(x, y)])
+    mask = gpd_data.intersects(poly)
+    ser = gpd_data[mask]
+    return ser
+
+# Setup figure and axis
+fig, ax = plt.subplots()
+# Plot DFX
+ax_top = gpd_data["geometry"].plot(ax=ax, color="k", alpha=0.5, edgecolor="black")
+plt.title("Rectangle selector")
 plt.xlabel("X-axis")
 plt.ylabel("Y-axis")
-plt.axis('equal')
-plt.grid()
+plt.grid("on")
+# Store selected rectangles
+selected_rectangles = []
+
+def on_select(eclick, erelease):
+    # Extract corner coordinates
+    x1, y1 = eclick.xdata, eclick.ydata  # First click
+    x2, y2 = erelease.xdata, erelease.ydata  # Release point
+
+    # Calculate corners
+    x_min, x_max = sorted([x1, x2])
+    y_min, y_max = sorted([y1, y2])
+
+    corners = [(x_min, y_min), (x_min, y_max),
+               (x_max, y_max), (x_max, y_min)]
+    
+    selected_rectangles.append(corners)
+
+    print("Rectangle drawn with corners:")
+    for i, (x, y) in enumerate(corners, 1):
+        print(f"  Corner {i}: ({x:.2f}, {y:.2f})")
+
+    # Optional: draw rectangle for visual feedback
+    rect = plt.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min,
+                         linewidth=2, edgecolor='red', facecolor='none')
+    ax.add_patch(rect)
+    fig.canvas.draw()
+
+# Create RectangleSelector
+toggle_selector = RectangleSelector(
+    ax, on_select,
+    useblit=True,
+    button=[1],  # Left mouse button
+    minspanx=1, minspany=1,
+    spancoords='data',
+    interactive=True
+)
+
+plt.show()
+
+# After window closes, print all stored rectangles
+print("\nAll saved rectangles:")
+for i, rect in enumerate(selected_rectangles):
+    print(f"Rectangle {i+1} corners: {rect}")
+x_rect = [rect[0][0] for rect in selected_rectangles]
+y_rect = [rect[0][1] for rect in selected_rectangles]
+
+print('Selected rectangles:')
+print(selected_rectangles)
+print('x_rect:')
+print(x_rect)
+print('y_rect:')
+print(y_rect)
+selected_lines = extract_from_polygon(gpd_data["geometry"], x_rect, y_rect)
+selected_lines.to_csv("lines_snippet_from_rectangle.csv", index=False)
+
+
 plt.show()
 
 # %%
