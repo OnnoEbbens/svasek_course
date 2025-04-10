@@ -7,10 +7,8 @@
 # Coordinaten van lijnstuk of lijnstukken exporteren aan de hand van naam
 # Lijnstukken binnen range exporteren
 
-# TODO: CSV naar bruikbaar bestand (dictionary)
-# TODO: z-dimensie toevoegen in slice
-# TODO: Interactief selecteren van gebied
-# TODO: Omzetten naar class
+# TODO: z-dimensie toevoegen in slices
+# TODO: Plotjes netter maken
 
 # %% Imports
 import ezdxf
@@ -182,6 +180,12 @@ class DXFReader:
         return x_data, y_data
 
     def lines_to_csv(self, x_lines, y_lines):
+        """Save selected lines to csv files.
+
+        Args:
+            x_lines (list): x coordinates of the selected lines
+            y_lines (list): y coordinates of the selected lines
+        """
         # Save x and y to csv file
         for i in range(len(x_lines)):
             ix = x_lines[i]
@@ -190,6 +194,16 @@ class DXFReader:
             df.to_csv(f"line_{i}.csv", index=False)
 
     def extract_from_polygon(self, x_p, y_p, z=None):
+        """Extract lines from a polygon defined by x_p and y_p.
+
+        Args:
+            x_p (list): x coordinates of polygon
+            y_p (list): y coordinates of polygon
+            z (list, optional): NOT YET ADDED. Defaults to None.
+
+        Returns:
+            geopandas.geodataframe: subset of original dataframe that lies inside the polygon.
+        """
         poly = Polygon([(x_p, y_p) for x_p, y_p in zip(x_p, y_p)])
         mask = self.gpd_data.geometry.within(poly)
         ser = self.gpd_data[mask]
@@ -200,6 +214,8 @@ class DXFReader:
         return ser
 
     def get_lines_from_rectangle(self):
+        """Select lines from a rectangle in the figure and save to csv/geojson files.
+        """
         fig, ax = self._set_fig()
         plt.xlabel("X-axis")
         plt.ylabel("Y-axis")
@@ -283,6 +299,8 @@ class DXFReader:
         plt.show()
 
     def _entities_to_shapely(self):
+        """Transform the DXF entities to shapely geometries.
+        """
         for entity in self.msp:
             try:
                 if entity.dxftype() == "LINE":
@@ -304,11 +322,27 @@ class DXFReader:
                 print(f"Error processing entity {entity}: {e}")
 
     def _get_lines(self, entity):
+        """Get the 'lines' from the DXF entity.
+
+        Args:
+            entity (dxf.entity): considered entity
+
+        Returns:
+            shapely.LineString: shapely LineString object
+        """
         linepoints = [entity.dxf.start, entity.dxf.end]
         line = LineString(linepoints)
         return line
 
     def _get_lwpolylines(self, entity):
+        """Get the 'lwpolylines' from the DXF entity.
+
+        Args:
+            entity (dxf.entity): considered entity
+
+        Returns:
+            shapely.LineString or shapely.Polygon: shapely LineString or Polygon object
+        """
         points = entity.get_points("xy")
         elevation = entity.dxf.elevation
         linepoints = [list(point) + [elevation] for point in points]
@@ -319,6 +353,14 @@ class DXFReader:
         return line
 
     def _get_polylines(self, entity):
+        """Get the 'polylines' from the DXF entity.
+
+        Args:
+            entity (ezdxf.entity): considered entity
+
+        Returns:
+            shapely.LineString or shapely.Polygon: shapely LineString or Polygon object
+        """
         linepoints = [[point[0], point[1], point[2]] for point in entity.points()]
         if linepoints[-1] == linepoints[0]:
             line = Polygon(linepoints)
