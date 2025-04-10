@@ -39,6 +39,8 @@ class DXFReader:
         self.detect_3d()
 
     def get_entities(self):
+        """Get a summary of the entities in the DXF file.
+        """
         for entity in self.msp:
             self.entities[entity.dxftype()] += 1
 
@@ -49,6 +51,8 @@ class DXFReader:
         print("")
 
     def detect_3d(self):
+        """Detect if the DXF file is 3D or 2D.
+        """
         for entity in self.entities:
             for geometry in self.msp.query(entity):
                 try:
@@ -66,6 +70,9 @@ class DXFReader:
         print("")
 
     def entities_to_gpd(self):
+        """Transform the DXF entities to a GeoDataFrame.
+        Sets self.gpd_data to a GeoDataFrame containing the lines.
+        """
         self._entities_to_shapely()
         gpd_lines = gpd.GeoDataFrame({"geometry": self.lines["LINES"]})
         gpd_lwpolylines = gpd.GeoDataFrame({"geometry": self.lines["LWPOLYLINES"]})
@@ -80,6 +87,8 @@ class DXFReader:
             self.get_yz()
 
     def plot_dxf(self):
+        """Plot the DXF file
+        """
         fig1, ax1 = self._set_fig()
         plt.title("Top down view")
         plt.xlabel("X-axis")
@@ -98,19 +107,39 @@ class DXFReader:
         plt.show()
 
     def get_yz(self):
+        """Ge the yz coordinates of the geometry
+        """
         self.gpd_data["geometry_yz"] = self.gpd_data["geometry"].apply(
             self._change_xy_to_yz
         )
 
     def set_crs(self, crs):
+        """Set the coordinate reference system of the GeoDataFrame.
+
+        Args:
+            crs (string): crs in EPSG format (e.g. "EPSG:31370").
+        """
         self.gpd_data.set_crs(crs, inplace=True)
 
     def transform_crs(self, crs):
+        """Transform the coordinate reference system of the GeoDataFrame.
+
+        Args:
+            crs (string): crs in EPSG format (e.g. "EPSG:31370").
+
+        Raises:
+            ValueError: If the CRS is not set in geodataframe
+        """
         if self.gpd_data.crs is None:
             raise ValueError("CRS not set. Please set the CRS before transforming.")
         self.gpd_data.to_crs(crs, inplace=True)
         
     def get_lines_from_fig(self):
+        """Click in figure to select lines and save to csv files
+
+        Returns:
+            List, List: x and y coordinates of the selected lines
+        """
         fig, ax = self._set_fig()
         plt.xlabel("X-axis")
         plt.ylabel("Y-axis")
@@ -373,5 +402,3 @@ if __name__ == "__main__":
 
     # Lines to kml
     lines_to_kml(x_lines, y_lines)
-
-    exit()
