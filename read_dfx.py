@@ -299,6 +299,13 @@ selected_lines = extract_from_polygon(gpd_data["geometry"], x_rect, y_rect)
 selected_lines.to_csv("lines_snippet_from_rectangle.csv", index=False)
 
 
+# %% Plot top-down and side view
+
+ax_side = gpd_data["geometry_yz"].plot(color="k", alpha=0.5, edgecolor="black")
+plt.title("Side view")
+plt.xlabel("Y-axis")
+plt.ylabel("Z-axis")
+plt.grid("on")
 plt.show()
 
 # %%
