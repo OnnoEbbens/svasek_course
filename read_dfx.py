@@ -9,6 +9,9 @@
 
 # TODO: z-dimensie toevoegen in slices
 # TODO: Plotjes netter maken
+# TODO: Georeferencing met meerdere punten
+# TODO: Layers?
+# TODO: 3d plot van subselectie
 
 # %% Imports
 import ezdxf
@@ -137,7 +140,7 @@ class DXFReader:
         if self.gpd_data.crs is None:
             raise ValueError("CRS not set. Please set the CRS before transforming.")
         self.gpd_data.to_crs(crs, inplace=True)
-        
+
     def get_lines_from_fig(self):
         """Click in figure to select lines and save to csv files
 
@@ -420,8 +423,8 @@ def lines_to_kml(x, y):
 
 def georeference_from_points(src1, src2, dst1, dst2):
     # Vectors in source and destination coordinate systems
-    src_vector = src2-src1
-    dst_vector = dst2-dst1
+    src_vector = src2 - src1
+    dst_vector = dst2 - dst1
 
     # Calculate the scale factor & angles
     scale = np.linalg.norm(dst_vector) / np.linalg.norm(src_vector)
@@ -451,29 +454,44 @@ if __name__ == "__main__":
     filename2d = "../oostende_2d.dxf"
     filename3d = "../oostende.dxf"
 
-    # Read in the DXF file
-    dxf = DXFReader(filename)
+    # Read in the DXF files & get geopandas dataframes
+    dxf2d = DXFReader(filename2d)
+    dxf2d.entities_to_gpd()
 
-    # Create GeoDataFrame from the lines
-    dxf.entities_to_gpd()
+    print("")
 
-    # Set CRS
-    dxf.set_crs("EPSG:31370")
-
-    # Transform CRS
-    dxf.transform_crs("EPSG:4326")
+    dxf3d = DXFReader(filename3d)
+    dxf3d.entities_to_gpd()
+    dxf3d.set_crs("EPSG:31370")
+    dxf3d.transform_crs("EPSG:4326")
 
     # Plot the figures
-    # dxf.plot_dxf()
+    dxf3d.plot_dxf()
 
     # Extract lines from rectangle in figure
-    # dxf.get_lines_from_rectangle()
+    dxf3d.get_lines_from_rectangle()
 
     # Convert GeoJSON to KML
-    # geojson_to_kml("lines_snippet_from_rectangle.geojson")
+    geojson_to_kml("lines_snippet_from_rectangle.geojson")
 
     # Extract lines by clicking in figure
-    x_lines, y_lines = dxf.get_lines_from_fig()
+    x_lines, y_lines = dxf3d.get_lines_from_fig()
 
     # Lines to kml
     lines_to_kml(x_lines, y_lines)
+
+    # Plot 2d dxf
+    dxf2d.plot_dxf()
+
+    point1 = np.array([291951.5357442555, 159387.03494264072])
+    point2 = np.array([290215.8755603057, 159470.8846086447])
+
+    dest1 = np.array([2.942091, 51.224498])
+    dest2 = np.array([2.942112, 51.224673])
+    affine_params = georeference_from_points(point1, point2, dest1, dest2)
+
+    dxf2d.gpd_data["geometry"] = dxf2d.gpd_data["geometry"].apply(
+        lambda geom: affine_transform(geom, affine_params)
+    )
+    dxf2d.set_crs("EPSG:4326")
+    dxf2d.plot_dxf()
