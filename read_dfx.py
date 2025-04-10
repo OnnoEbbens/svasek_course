@@ -180,6 +180,53 @@ gpd_data["geometry_yz"] = gpd_data["geometry"].apply(change_xy_to_yz)
 
 # gpd_blocks = gpd.GeoDataFrame({'geometry': lines['BLOCKS']})
 
+# %% Get line from interactive plot
+def interactive_plot(gpd_data):
+    fig, ax = plt.subplots()
+    plt.title("Top down view")
+    plt.xlabel("X-axis")
+    plt.ylabel("Y-axis")
+    plt.grid(True)
+    ax.set_aspect('equal')
+
+    # Plot each geometry separately so we can attach a picker
+    lines = []
+    for geom in gpd_data.geometry:
+        if geom.geom_type == 'LineString':
+            x, y = geom.xy
+            line, = ax.plot(x, y, color='k', alpha=0.5, picker=2)
+            lines.append(line)
+
+    # Pick event callback
+    x_data = []
+    y_data = []
+    def on_pick(event):
+        line = event.artist
+        xdata = line.get_xdata()
+        ydata = line.get_ydata()
+        
+        print("Selected line coordinates:")
+        print(list(zip(xdata, ydata)))
+
+        x_data.append(xdata)
+        y_data.append(ydata)
+
+        line.set_color("red")
+        fig.canvas.draw()
+
+    fig.canvas.mpl_connect("pick_event", on_pick)
+    return x_data, y_data
+
+x_lines, y_lines = interactive_plot(gpd_data)
+plt.show()
+
+# Save x and y to csv file
+for i in range(len(x_lines)):
+    ix = x_lines[i]
+    iy = y_lines[i]
+    df = pd.DataFrame({"x": ix, "y": iy})
+    df.to_csv(f"line_{i}.csv", index=False)
+    
 plt.xlabel("X-axis")
 plt.ylabel("Y-axis")
 plt.axis('equal')
