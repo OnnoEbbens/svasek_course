@@ -414,6 +414,34 @@ def lines_to_kml(x, y):
     kml.save("lines.kml")
 
 
+def georeference_from_points(src1, src2, dst1, dst2):
+    # Vectors in source and destination coordinate systems
+    src_vector = src2-src1
+    dst_vector = dst2-dst1
+
+    # Calculate the scale factor & angles
+    scale = np.linalg.norm(dst_vector) / np.linalg.norm(src_vector)
+    angle_src = np.arctan2(src_vector[1], src_vector[0])
+    angle_dst = np.arctan2(dst_vector[1], dst_vector[0])
+    theta = angle_dst - angle_src
+
+    # Rotation matrix
+    cos_theta = np.cos(theta)
+    sin_theta = np.sin(theta)
+
+    # Affine coefficients for Shapely
+    a = scale * cos_theta
+    b = -scale * sin_theta
+    c = scale * sin_theta
+    d = scale * cos_theta
+
+    # Translate src1 to origin
+    xoff = dst1[0] - (a * src1[0] + b * src1[1])
+    yoff = dst1[1] - (c * src1[0] + d * src1[1])
+
+    return [a, b, c, d, xoff, yoff]
+
+
 # %% Input
 if __name__ == "__main__":
     filename = "../oostende.dxf"
